@@ -117,65 +117,78 @@ columns to that table.
         # @param [String] attr Attribute name
         # @param [Symbol] _locale Locale
         # @return [Arel::Attributes::Attribute] Arel node for column on translation table
-        def build_node(attr, _locale)
-          model_class.const_get(subclass_name).arel_table[attr]
+        def build_node(attr, locale)
+          # Arel::Attribute.new(self, attr, locale)
+          Arel::Attribute.new(model_class.const_get(subclass_name).arel_table, attr, self)
         end
 
-        # Joins translations using either INNER/OUTER join appropriate to the
-        # query. So for example, using the Query plugin:
-        #
-        # Article.i18n.where(title: nil, content: nil)   #=> OUTER JOIN (all nils)
-        # Article.i18n.where(title: "foo", content: nil) #=> INNER JOIN (one non-nil)
-        #
-        # In the first case, if we are in (say) the "en" locale, then we should
-        # match articles that have *no* article_translations with English
-        # locales (since no translation is equivalent to a nil value). If we
-        # used an INNER JOIN in the first case, an article with no English
-        # translations would be filtered out, so we use an OUTER JOIN.
-        #
-        # When deciding whether to use an outer or inner join, array-valued
-        # conditions are treated as nil if they have any values.
-        #
-        # Article.i18n.where(title: nil, content: ["foo", nil])            #=> OUTER JOIN (all nil or array with nil)
-        # Article.i18n.where(title: "foo", content: ["foo", nil])          #=> INNER JOIN (one non-nil)
-        # Article.i18n.where(title: ["foo", "bar"], content: ["foo", nil]) #=> INNER JOIN (one non-nil array)
-        #
-        # The logic also applies when a query has more than one where clause.
-        #
-        # Article.where(title: nil).where(content: nil)   #=> OUTER JOIN (all nils)
-        # Article.where(title: nil).where(content: "foo") #=> INNER JOIN (one non-nil)
-        # Article.where(title: "foo").where(content: nil) #=> INNER JOIN (one non-nil)
-        #
-        # @param [ActiveRecord::Relation] relation Relation to scope
-        # @param [Hash] opts Hash of options for query
-        # @param [Symbol] locale Locale
-        # @option [Boolean] invert
-        def add_translations(relation, opts, locale, invert:)
-          outer_join = require_outer_join?(opts, invert)
-          return relation if already_joined?(relation, table_name, outer_join)
+        private
 
+        def visitor
+          @visitor ||= Visitor.new(self)
+        end
+      end
+
+      class Visitor < Arel::Visitor
+        OUTER = ::Arel::Nodes::OuterJoin
+        INNER = ::Arel::Nodes::InnerJoin
+
+        def accept(object, relation, locale, invert: false)
+          if join_type = super(object, nil, locale, invert: invert)
+            join_translations(relation, locale, join_type)
+          else
+            relation
+          end
+        end
+
+        private
+
+        %w[model_class subclass_name foreign_key table_name].each do |meth|
+          delegate meth, to: :backend_class
+        end
+
+        def visit_Arel_Nodes_Equality(object, join_type, locale, invert:)
+          if visit_Arel_Nodes_Binary(object, join_type, locale, invert: invert)
+            (!invert && [object.left, object.right].any?(&:nil?)) ? OUTER : INNER
+          end
+        end
+
+        def visit_Array(objects, relation, *args)
+          objects.inject(relation) do |rel, obj|
+            visit(obj, rel, *args).tap { |j| return j if j == INNER }
+          end
+        end
+
+        def visit_Arel_Nodes_And(object, relation, *args)
+          visit_Array(object.children, relation, *args)
+        end
+
+        def visit_Mobility_Arel_Attribute(object, join_type, _locale, **)
+          backend_class == object.backend_class ? OUTER : join_type
+        end
+
+        def join_translations(relation, locale, join_type)
+          return relation if already_joined?(relation, join_type)
           t = model_class.const_get(subclass_name).arel_table
           m = model_class.arel_table
-          join_type = outer_join ? ::Arel::Nodes::OuterJoin : ::Arel::Nodes::InnerJoin
           relation.joins(m.join(t, join_type).
                          on(t[foreign_key].eq(m[:id]).
                             and(t[:locale].eq(locale))).join_sources)
         end
 
-        private
-
-        def already_joined?(relation, table_name, outer_join)
-          if join = relation.joins_values.find { |v| (::Arel::Nodes::Join === v) && (v.left.name == table_name.to_s) }
-            return true if outer_join || ::Arel::Nodes::InnerJoin === join
+        def already_joined?(relation, join_type)
+          if join = get_join(relation)
+            return true if (join_type == OUTER) || (INNER === join)
             relation.joins_values = relation.joins_values - [join]
           end
           false
         end
 
-        def require_outer_join?(opts, invert)
-          !invert && opts.values.compact.all? { |v| ![*v].all? }
+        def get_join(relation)
+          relation.joins_values.find { |v| (::Arel::Nodes::Join === v) && (v.left.name == table_name.to_s) }
         end
       end
+      private_constant :Visitor
 
       setup do |_attributes, options|
         association_name = options[:association_name]

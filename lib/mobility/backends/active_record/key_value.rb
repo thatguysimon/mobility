@@ -49,36 +49,56 @@ Implements the {Mobility::Backends::KeyValue} backend for ActiveRecord models.
         # @return [Arel::Attributes::Attribute] Arel attribute for aliased
         #   translation table value column
         def build_node(attr, _locale)
-          class_name.arel_table.alias("#{attr}_#{association_name}")[:value]
-        end
-
-        # @param [ActiveRecord::Relation] relation Relation to scope
-        # @param [Hash] opts Hash of options for query
-        # @param [Symbol] locale Locale
-        # @option [Boolean] invert
-        def add_translations(relation, opts, locale, invert: false)
-          i18n_keys, i18n_nulls = partition_opts(opts)
-
-          relation = join_translations(relation, i18n_keys, locale)
-          join_translations(relation, i18n_nulls, locale, outer_join: !invert)
+          aliased_table = class_name.arel_table.alias("#{attr}_#{association_name}")
+          Arel::Attribute.new(aliased_table, :value, self, attr.to_sym)
         end
 
         private
 
-        def partition_opts(opts)
-          opts.keys.partition { |key| opts[key] && [*opts[key]].all? }
+        def visitor
+          @visitor ||= Visitor.new(self)
         end
 
-        def join_translations(relation, keys, locale, outer_join: false)
-          keys.inject(relation) do |r, key|
-            t = class_name.arel_table.alias("#{key}_#{association_name}")
+        class Visitor < Arel::Visitor
+          OUTER = ::Arel::Nodes::OuterJoin
+          INNER = ::Arel::Nodes::InnerJoin
+
+          def accept(object, relation, locale, invert: false)
+            super(object, {}, locale, invert: invert).inject(relation) do |rel, (attr, join_type)|
+              join_translations(rel, attr, locale, join_type)
+            end
+          end
+
+          private
+
+          %w[model_class class_name association_name].each { |meth| delegate meth, to: :backend_class }
+
+          def visit_Mobility_Arel_Attribute(object, hash, locale, **)
+            if object.backend_class == backend_class
+              hash[object.attribute_name] ||= INNER
+            end
+            hash
+          end
+
+          def visit_Arel_Nodes_Equality(object, hash, locale, invert:)
+            hash = visit_Arel_Nodes_Binary(object, hash, locale, invert: invert)
+            children = [object.left, object.right]
+            if !invert &&
+                children.any?(&:nil?) &&
+                (child = children.find { |child| child.backend_class == backend_class })
+              hash[child.attribute_name] = OUTER
+            end
+            hash
+          end
+
+          def join_translations(relation, key, locale, join_type)
             m = model_class.arel_table
-            join_type = outer_join ? ::Arel::Nodes::OuterJoin : ::Arel::Nodes::InnerJoin
-            r.joins(m.join(t, join_type).
-                    on(t[:key].eq(key).
-                       and(t[:locale].eq(locale).
-                           and(t[:translatable_type].eq(model_class.base_class.name).
-                               and(t[:translatable_id].eq(m[:id]))))).join_sources)
+            t = class_name.arel_table.alias("#{key}_#{association_name}")
+            relation.joins(m.join(t, join_type).
+                           on(t[:key].eq(key).
+                              and(t[:locale].eq(locale).
+                                  and(t[:translatable_type].eq(model_class.base_class.name).
+                                      and(t[:translatable_id].eq(m[:id]))))).join_sources)
           end
         end
       end

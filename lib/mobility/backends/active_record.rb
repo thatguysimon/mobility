@@ -20,15 +20,15 @@ module Mobility
           raise NotImplementedError
         end
 
-        # @param [ActiveRecord::Relation] relation Relation to scope
-        # @param [Symbol] locale Locale
-        # @option [Boolean] invert
-        # @return [ActiveRecord::Relation] Relation with scope added
-        def add_translations(relation, _opts, _locale, invert: false)
-          relation
+        def accept(predicate, relation, locale, invert: false)
+          visitor.accept(predicate, relation, locale, invert: invert)
         end
 
         private
+
+        def visitor
+          @visitor ||= Arel::NullVisitor.new
+        end
 
         def build_quoted(value)
           ::Arel::Nodes.build_quoted(value)

@@ -68,29 +68,24 @@ class to build ActiveRecord queries from Arel nodes.
 
               def build_maps!(interface, opts, locale, invert:)
                 keys = opts.keys.map(&:to_s)
-                interface.modules.select { |mod| mod.options[:query] }.map { |mod|
-                  next if (mod_keys = mod.names & keys).empty?
+                mods = interface.modules.select { |mod| mod.options[:query] }
 
-                  mod_opts = opts.slice(*mod_keys)
-                  predicates = mod_keys.map do |key|
-                    build_predicate(interface[key.to_sym], opts.delete(key), invert: invert)
+                mods.map { |mod|
+                  next if (i18n_keys = mod.names & keys).empty?
+
+                  predicates = i18n_keys.map do |key|
+                    build_predicate(interface[key.to_sym, locale], opts.delete(key))
                   end
 
-                  ->(rel) do
-                    mod.backend_class.
-                      add_translations(rel, mod_opts, locale, invert: invert).
-                      where(predicates.inject(&:and))
+                  ->(relation) do
+                    relation = mod.backend_class.accept(predicates, relation, locale, invert: invert)
+                    predicates = predicates.map(&method(:invert_predicate)) if invert
+                    relation.where(predicates.inject(&:and))
                   end
                 }.compact
               end
 
-              def build_predicate(node, values, invert:)
-                predicate = convert_to_predicate(node, values)
-                predicate = invert(predicate) if invert
-                predicate
-              end
-
-              def convert_to_predicate(node, values)
+              def build_predicate(node, values)
                 nils, vals = partition_values(values)
 
                 return node.eq(nil) if vals.empty?
@@ -105,7 +100,7 @@ class to build ActiveRecord queries from Arel nodes.
               end
 
               # Adapted from AR::Relation::WhereClause#invert_predicate
-              def invert(node)
+              def invert_predicate(node)
                 case node
                 when ::Arel::Nodes::In
                   ::Arel::Nodes::NotIn.new(node.left, node.right)
