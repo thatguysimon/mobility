@@ -25,7 +25,7 @@ class to build ActiveRecord queries from Arel nodes.
                     backends = attrs.map { |attr| mobility.backends[attr.to_sym] }.uniq
                     nodes    = attrs.map { |attr| mobility[attr] }
 
-                    predicate = yield nodes
+                    predicate = yield *nodes
 
                     backends.uniq.inject(all) { |relation, klass|
                       klass.add_translations(predicate, relation, locale)
