@@ -24,9 +24,11 @@ class to build ActiveRecord queries from Arel nodes.
                   else
                     backends = attrs.map { |attr| mobility.backends[attr.to_sym] }.uniq
                     nodes    = attrs.map { |attr| mobility[attr] }
-                    predicate = yield(nodes)
-                    processed = backends.uniq.inject(all) { |relation, klass|
-                      klass.accept(predicate, relation, locale)
+
+                    predicate = yield nodes
+
+                    backends.uniq.inject(all) { |relation, klass|
+                      klass.add_translations(predicate, relation, locale)
                     }.where(predicate)
                   end
                 end
@@ -87,7 +89,7 @@ class to build ActiveRecord queries from Arel nodes.
                   end
 
                   ->(relation) do
-                    relation = mod.backend_class.accept(predicates, relation, locale, invert: invert)
+                    relation = mod.backend_class.add_translations(predicates, relation, locale, invert: invert)
                     predicates = predicates.map(&method(:invert_predicate)) if invert
                     relation.where(predicates.inject(&:and))
                   end

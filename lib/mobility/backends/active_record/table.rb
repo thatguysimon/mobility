@@ -122,6 +122,10 @@ columns to that table.
           Arel::Attribute.new(model_class.const_get(subclass_name).arel_table, attr, self)
         end
 
+        def add_translations(predicate, relation, locale, invert: false)
+          visitor.accept(predicate, relation, locale, invert: invert)
+        end
+
         private
 
         def visitor

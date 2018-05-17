@@ -20,15 +20,11 @@ module Mobility
           raise NotImplementedError
         end
 
-        def accept(predicate, relation, locale, invert: false)
-          visitor.accept(predicate, relation, locale, invert: invert)
+        def add_translations(_predicate, relation, _locale, invert: false)
+          relation
         end
 
         private
-
-        def visitor
-          @visitor ||= Arel::NullVisitor.new
-        end
 
         def build_quoted(value)
           ::Arel::Nodes.build_quoted(value)

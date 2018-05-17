@@ -53,6 +53,10 @@ Implements the {Mobility::Backends::KeyValue} backend for ActiveRecord models.
           Arel::Attribute.new(aliased_table, :value, self, attr.to_sym)
         end
 
+        def add_translations(predicate, relation, locale, invert: false)
+          visitor.accept(predicate, relation, locale, invert: invert)
+        end
+
         private
 
         def visitor

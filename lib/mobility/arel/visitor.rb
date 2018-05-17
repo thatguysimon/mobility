@@ -54,13 +54,5 @@ module Mobility
         visit_collection([object.case, object.conditions, object.default], relation, *args)
       end
     end
-
-    class NullVisitor < Visitor
-      private
-
-      def visit(_object, relation, *)
-        relation
-      end
-    end
   end
 end
