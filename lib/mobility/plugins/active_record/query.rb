@@ -18,8 +18,17 @@ class to build ActiveRecord queries from Arel nodes.
             unless const_defined?(:QueryMethod)
               const_set :QueryMethod, Module.new
               QueryMethod.module_eval <<-EOM, __FILE__, __LINE__ + 1
-                def #{Mobility.query_method}
-                  all.extending(QueryExtension)
+                def #{Mobility.query_method}(*attrs, locale: Mobility.locale)
+                  if attrs.empty?
+                    all.extending(QueryExtension)
+                  else
+                    backends = attrs.map { |attr| mobility.backends[attr.to_sym] }.uniq
+                    nodes    = attrs.map { |attr| mobility[attr] }
+                    predicate = yield(nodes)
+                    processed = backends.uniq.inject(all) { |relation, klass|
+                      klass.accept(predicate, relation, locale)
+                    }.where(predicate)
+                  end
                 end
               EOM
               private_constant :QueryMethod
