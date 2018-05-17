@@ -117,7 +117,7 @@ columns to that table.
         # @param [String] attr Attribute name
         # @param [Symbol] _locale Locale
         # @return [Arel::Attributes::Attribute] Arel node for column on translation table
-        def build_node(attr, locale)
+        def build_node(attr, _locale)
           # Arel::Attribute.new(self, attr, locale)
           Arel::Attribute.new(model_class.const_get(subclass_name).arel_table, attr, self)
         end

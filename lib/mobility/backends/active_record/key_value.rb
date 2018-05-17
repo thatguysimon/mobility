@@ -73,7 +73,7 @@ Implements the {Mobility::Backends::KeyValue} backend for ActiveRecord models.
 
           %w[model_class class_name association_name].each { |meth| delegate meth, to: :backend_class }
 
-          def visit_Mobility_Arel_Attribute(object, hash, locale, **)
+          def visit_Mobility_Arel_Attribute(object, hash, _locale, **)
             if object.backend_class == backend_class
               hash[object.attribute_name] ||= INNER
             end
@@ -85,7 +85,7 @@ Implements the {Mobility::Backends::KeyValue} backend for ActiveRecord models.
             children = [object.left, object.right]
             if !invert &&
                 children.any?(&:nil?) &&
-                (child = children.find { |child| child.backend_class == backend_class })
+                (child = children.find { |c| c.backend_class == backend_class })
               hash[child.attribute_name] = OUTER
             end
             hash
