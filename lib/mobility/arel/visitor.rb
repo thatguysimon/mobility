@@ -17,6 +17,7 @@ module Mobility
       def visit(object)
         super
       rescue TypeError
+        nil
       end
 
       def visit_collection(objects)
