@@ -33,7 +33,7 @@ module Mobility
         end
 
         def combine_visit(objects, join_type)
-          objects.map(&method(:visit)).compact.inject({}) do |hash, visited|
+          objects.map(&method(:visit)).compact.inject do |hash, visited|
             visited.merge(hash) { |_, old, new| old == join_type ? old : new }
           end
         end
