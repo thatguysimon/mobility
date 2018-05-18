@@ -8,8 +8,9 @@ module Mobility
         private
 
         def visit_Arel_Nodes_Equality(object)
-          if [object.left, object.right].any?(&method(:visit))
-            [object.left, object.right].any?(&:nil?) ? OUTER_JOIN : INNER_JOIN
+          nils, nodes = [object.left, object.right].partition(&:nil?)
+          if nodes.any?(&method(:visit))
+            nils.empty? ? INNER_JOIN : OUTER_JOIN
           end
         end
 

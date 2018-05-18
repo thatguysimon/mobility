@@ -17,6 +17,7 @@ module Mobility
       def visit_collection(objects)
         objects.find(&method(:visit))
       end
+      alias :visit_Array :visit_collection
 
       def visit_Arel_Nodes_Unary(object)
         visit(object.expr)
