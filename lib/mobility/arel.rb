@@ -1,3 +1,4 @@
+# frozen-string-literal: true
 require "mobility/arel/nodes"
 require "mobility/arel/visitor"
 

@@ -230,6 +230,14 @@ shared_examples_for "AR Model with translated scope" do |model_class_name, attri
       end
     end
   end
+
+  describe "Arel queries" do
+    it "handles OR queries" do
+      instance1 = model_class.create(attribute1 => "foo")
+      instance2 = model_class.create
+      expect(model_class.i18n(attribute1) { |attr| attr.eq(nil).or(attr.eq("foo")) }).to match_array([instance1, instance2])
+    end
+  end
 end
 
 shared_examples_for "Sequel Model with translated dataset" do |model_class_name, attribute1=:title, attribute2=:content|

@@ -20,7 +20,7 @@ module Mobility
           raise NotImplementedError
         end
 
-        def add_translations(_predicate, relation, _locale, invert: false)
+        def add_translations(relation, _predicate, _locale, invert: false)
           relation
         end
 

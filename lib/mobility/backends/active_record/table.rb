@@ -2,6 +2,7 @@
 require "mobility/backends/active_record"
 require "mobility/backends/table"
 require "mobility/active_record/model_translation"
+require "mobility/arel/visitors/table_visitor"
 
 module Mobility
   module Backends
@@ -122,23 +123,10 @@ columns to that table.
           Arel::Attribute.new(model_class.const_get(subclass_name).arel_table, attr, self)
         end
 
-        def add_translations(predicate, relation, locale, invert: false)
-          visitor.accept(predicate, relation, locale, invert: invert)
-        end
-
-        private
-
-        def visitor
-          @visitor ||= Visitor.new(self)
-        end
-      end
-
-      class Visitor < Arel::Visitor
-        OUTER = ::Arel::Nodes::OuterJoin
-        INNER = ::Arel::Nodes::InnerJoin
-
-        def accept(object, relation, locale, invert: false)
-          if join_type = super(object, nil, locale, invert: invert)
+        def add_translations(relation, predicate, locale, invert: false)
+          visitor = Arel::Visitors::TableVisitor.new(self)
+          if join_type = visitor.accept(predicate)
+            join_type &&= ::Arel::Nodes::InnerJoin if invert
             join_translations(relation, locale, join_type)
           else
             relation
@@ -146,30 +134,6 @@ columns to that table.
         end
 
         private
-
-        %w[model_class subclass_name foreign_key table_name].each do |meth|
-          delegate meth, to: :backend_class
-        end
-
-        def visit_Arel_Nodes_Equality(object, join_type, locale, invert:)
-          if visit_Arel_Nodes_Binary(object, join_type, locale, invert: invert)
-            (!invert && [object.left, object.right].any?(&:nil?)) ? OUTER : INNER
-          end
-        end
-
-        def visit_Array(objects, relation, *args)
-          objects.inject(relation) do |rel, obj|
-            visit(obj, rel, *args).tap { |j| return j if j == INNER }
-          end
-        end
-
-        def visit_Arel_Nodes_And(object, relation, *args)
-          visit_Array(object.children, relation, *args)
-        end
-
-        def visit_Mobility_Arel_Attribute(object, join_type, _locale, **)
-          backend_class == object.backend_class ? OUTER : join_type
-        end
 
         def join_translations(relation, locale, join_type)
           return relation if already_joined?(relation, join_type)
@@ -182,7 +146,7 @@ columns to that table.
 
         def already_joined?(relation, join_type)
           if join = get_join(relation)
-            return true if (join_type == OUTER) || (INNER === join)
+            return true if (join_type == ::Arel::Nodes::OuterJoin) || (::Arel::Nodes::InnerJoin === join)
             relation.joins_values = relation.joins_values - [join]
           end
           false
@@ -192,7 +156,6 @@ columns to that table.
           relation.joins_values.find { |v| (::Arel::Nodes::Join === v) && (v.left.name == table_name.to_s) }
         end
       end
-      private_constant :Visitor
 
       setup do |_attributes, options|
         association_name = options[:association_name]

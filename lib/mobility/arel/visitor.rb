@@ -2,6 +2,9 @@
 module Mobility
   module Arel
     class Visitor < ::Arel::Visitors::Visitor
+      INNER_JOIN = ::Arel::Nodes::InnerJoin
+      OUTER_JOIN = ::Arel::Nodes::OuterJoin
+
       attr_reader :backend_class
 
       def initialize(backend_class = nil)
@@ -9,49 +12,34 @@ module Mobility
         @backend_class = backend_class
       end
 
-      def accept(object, relation, locale, invert: false)
-        visit(object, relation, locale, invert: invert)
-      end
-
       private
 
-      # paraphrased from Arel::Visitors::Visitor#visit
-      def visit(object, relation, locale, options)
-        dispatch_method = dispatch[object.class]
-        send(dispatch_method, object, relation, locale, options)
-      rescue NoMethodError => e
-        raise e if respond_to?(dispatch_method, true)
-        superklass = object.class.ancestors.find { |klass|
-          respond_to?(dispatch[klass], true)
-        }
-        return relation unless superklass
-        dispatch[object.class] = dispatch[superklass]
-        retry
+      def visit_collection(objects)
+        objects.find(&method(:visit))
       end
 
-      def visit_collection(objects, relation, *args)
-        objects.inject(relation) { |rel, obj| visit(obj, rel, *args) }
-      end
-      alias :visit_Array :visit_collection
-
-      def visit_Arel_Nodes_Unary(object, relation, *args)
-        visit(object.expr, relation, *args)
+      def visit_Arel_Nodes_Unary(object)
+        visit(object.expr)
       end
 
-      def visit_Arel_Nodes_Binary(object, relation, *args)
-        visit_collection([object.left, object.right], relation, *args)
+      def visit_Arel_Nodes_Binary(object)
+        visit_collection([object.left, object.right])
       end
 
-      def visit_Arel_Nodes_Function(object, relation, *args)
-        visit_collection(object.expressions, relation, *args)
+      def visit_Arel_Nodes_Function(object)
+        visit_collection(object.expressions)
       end
 
-      def visit_Arel_Nodes_And(object, relation, *args)
-        visit_collection(object.children, relation, *args)
+      def visit_Arel_Nodes_Case(object)
+        visit_collection([object.case, object.conditions, object.default])
       end
 
-      def visit_Arel_Nodes_Case(object, relation, *args)
-        visit_collection([object.case, object.conditions, object.default], relation, *args)
+      def visit_Arel_Nodes_And(object)
+        visit_Array(object.children)
+      end
+
+      def visit_Arel_Nodes_Node(_)
+        nil
       end
     end
   end

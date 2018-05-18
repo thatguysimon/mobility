@@ -28,7 +28,7 @@ class to build ActiveRecord queries from Arel nodes.
                     predicate = yield *nodes
 
                     backends.uniq.inject(all) { |relation, klass|
-                      klass.add_translations(predicate, relation, locale)
+                      klass.add_translations(relation, predicate, locale)
                     }.where(predicate)
                   end
                 end
@@ -89,7 +89,7 @@ class to build ActiveRecord queries from Arel nodes.
                   end
 
                   ->(relation) do
-                    relation = mod.backend_class.add_translations(predicates, relation, locale, invert: invert)
+                    relation = mod.backend_class.add_translations(relation, predicates, locale, invert: invert)
                     predicates = predicates.map(&method(:invert_predicate)) if invert
                     relation.where(predicates.inject(&:and))
                   end
