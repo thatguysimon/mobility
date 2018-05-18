@@ -34,10 +34,7 @@ module Mobility
 
         def combine_visit(objects, join_type)
           objects.map(&method(:visit)).compact.inject({}) do |hash, visited|
-            visited.each do |attr, join|
-              hash[attr] = join unless hash[attr] == join_type
-            end
-            hash
+            visited.merge(hash) { |_, old, new| old == join_type ? old : new }
           end
         end
       end
