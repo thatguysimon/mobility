@@ -14,6 +14,11 @@ module Mobility
 
       private
 
+      def visit(object)
+        super
+      rescue TypeError
+      end
+
       def visit_collection(objects)
         objects.find(&method(:visit))
       end
@@ -40,7 +45,9 @@ module Mobility
       end
 
       def visit_Arel_Nodes_Node(_)
-        nil
+      end
+
+      def visit_Arel_Attributes_Attribute(_)
       end
     end
   end

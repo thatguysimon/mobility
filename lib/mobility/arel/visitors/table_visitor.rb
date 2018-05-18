@@ -5,7 +5,13 @@ module Mobility
   module Arel
     module Visitors
       class TableVisitor < Arel::Visitor
+        DEFAULT_JOIN = INNER_JOIN
+
         private
+
+        def visit_collection(objects)
+          combine_visit(objects, DEFAULT_JOIN)
+        end
 
         def visit_Arel_Nodes_Equality(object)
           nils, nodes = [object.left, object.right].partition(&:nil?)
@@ -23,7 +29,7 @@ module Mobility
         end
 
         def visit_Mobility_Arel_Attribute(object)
-          (backend_class == object.backend_class) && OUTER_JOIN
+          (backend_class == object.backend_class) && DEFAULT_JOIN
         end
 
         def combine_visit(objects, join_type)
@@ -31,7 +37,7 @@ module Mobility
             visited = visit(obj)
             return visited if visited == join_type
             visited
-          }.first
+          }.compact.first
         end
       end
     end

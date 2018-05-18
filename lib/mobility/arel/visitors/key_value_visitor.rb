@@ -5,17 +5,23 @@ module Mobility
   module Arel
     module Visitors
       class KeyValueVisitor < Arel::Visitor
+        DEFAULT_JOIN = INNER_JOIN
+
+        def accept(object)
+          visit(object) || {}
+        end
+
         private
 
         def visit_collection(objects)
-          objects.map(&method(:visit)).compact.inject(&:merge)
+          combine_visit(objects, DEFAULT_JOIN)
         end
 
         def visit_Arel_Nodes_Equality(object)
           nils, nodes = [object.left, object.right].partition(&:nil?)
-          hash = visit_collection(nodes)
-          hash = hash.transform_values { OUTER_JOIN } if nils.present?
-          hash
+          if hash = visit_collection(nodes)
+            hash.transform_values { nils.empty? ? INNER_JOIN : OUTER_JOIN }
+          end
         end
 
         def visit_Array(objects)
@@ -28,7 +34,7 @@ module Mobility
 
         def visit_Mobility_Arel_Attribute(object)
           if object.backend_class == backend_class
-            { object.attribute_name => INNER_JOIN }
+            { object.attribute_name => DEFAULT_JOIN }
           end
         end
 
