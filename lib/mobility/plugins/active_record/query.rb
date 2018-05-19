@@ -20,7 +20,7 @@ class to build ActiveRecord queries from Arel nodes.
               QueryMethod.module_eval <<-EOM, __FILE__, __LINE__ + 1
                 def #{Mobility.query_method}(locale: Mobility.locale, &block)
                   if block_given?
-                    row = VirtualRow.new(self)
+                    row = VirtualRow.new(self, locale)
                     predicate = row.instance_eval(&block)
 
                     backends = row.__attrs.map { |attr| mobility.backends[attr] }.uniq
@@ -43,14 +43,14 @@ class to build ActiveRecord queries from Arel nodes.
         class VirtualRow < BasicObject
           attr_reader :__attrs
 
-          def initialize(model_class)
-            @__model_class, @__attrs = model_class, []
+          def initialize(model_class, locale)
+            @__model_class, @__locale, @__attrs = model_class, locale, []
           end
 
           def method_missing(m, *args)
             if @__model_class.translated_attribute_names.include?(m.to_s)
               @__attrs << m
-              @__model_class.mobility[m]
+              @__model_class.mobility[m, @__locale]
             else
               super
             end
