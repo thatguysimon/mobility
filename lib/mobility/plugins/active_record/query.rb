@@ -51,6 +51,8 @@ class to build ActiveRecord queries from Arel nodes.
             if @__model_class.translated_attribute_names.include?(m.to_s)
               @__attrs |= [m]
               @__model_class.mobility[m, @__locale]
+            elsif @__model_class.column_names.include?(m.to_s)
+              @__model_class.arel_table[m]
             else
               super
             end
