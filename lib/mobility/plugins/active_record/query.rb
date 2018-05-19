@@ -23,9 +23,9 @@ class to build ActiveRecord queries from Arel nodes.
                     row = VirtualRow.new(self, locale)
                     predicate = row.instance_eval(&block)
 
-                    backends = row.__attrs.map { |attr| mobility.backends[attr] }.uniq
-                    backends.uniq.inject(all) { |relation, klass|
-                      klass.add_translations(relation, predicate, locale)
+                    backends = row.__attrs.map { |a| mobility.backends[a] }.uniq
+                    backends.inject(all) { |relation, backend|
+                      backend.add_translations(relation, predicate, locale)
                     }.where(predicate)
                   else
                     all.extending(QueryExtension)
