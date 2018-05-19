@@ -49,7 +49,7 @@ class to build ActiveRecord queries from Arel nodes.
 
           def method_missing(m, *args)
             if @__model_class.translated_attribute_names.include?(m.to_s)
-              @__attrs << m
+              @__attrs |= [m]
               @__model_class.mobility[m, @__locale]
             else
               super
