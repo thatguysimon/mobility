@@ -18,18 +18,17 @@ class to build ActiveRecord queries from Arel nodes.
             unless const_defined?(:QueryMethod)
               const_set :QueryMethod, Module.new
               QueryMethod.module_eval <<-EOM, __FILE__, __LINE__ + 1
-                def #{Mobility.query_method}(*attrs, locale: Mobility.locale)
-                  if attrs.empty?
-                    all.extending(QueryExtension)
-                  else
-                    backends = attrs.map { |attr| mobility.backends[attr.to_sym] }.uniq
-                    nodes    = attrs.map { |attr| mobility[attr] }
+                def #{Mobility.query_method}(locale: Mobility.locale, &block)
+                  if block_given?
+                    row = VirtualRow.new(self)
+                    predicate = row.instance_eval(&block)
 
-                    predicate = yield *nodes
-
+                    backends = row.__attrs.map { |attr| mobility.backends[attr] }.uniq
                     backends.uniq.inject(all) { |relation, klass|
                       klass.add_translations(relation, predicate, locale)
                     }.where(predicate)
+                  else
+                    all.extending(QueryExtension)
                   end
                 end
               EOM
@@ -38,6 +37,23 @@ class to build ActiveRecord queries from Arel nodes.
 
             model_class.extend QueryMethod
             model_class.extend FindByMethods.new(*attributes.names)
+          end
+        end
+
+        class VirtualRow < BasicObject
+          attr_reader :__attrs
+
+          def initialize(model_class)
+            @__model_class, @__attrs = model_class, []
+          end
+
+          def method_missing(m, *args)
+            if @__model_class.translated_attribute_names.include?(m.to_s)
+              @__attrs << m
+              @__model_class.mobility[m]
+            else
+              super
+            end
           end
         end
 
